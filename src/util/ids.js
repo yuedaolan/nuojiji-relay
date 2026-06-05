@@ -42,7 +42,7 @@ export function extractPushBodies(content) {
         }
         // 隐藏类型（xinsheng/memory/react/cal/note…）不发推送
     }
-    if (bodies.length) return bodies.slice(0, 8); // 防止超长连发刷屏，最多 8 条
+    if (bodies.length) return bodies; // 按每个气泡逐条发，不设上限
     // 非 JSON-Lines：整段当一条（截断）
     if (!sawJson && trimmed) return [trimmed.slice(0, 120)];
     return ['有新消息'];
