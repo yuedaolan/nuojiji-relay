@@ -33,8 +33,9 @@ const pad2 = (n) => String(n).padStart(2, '0');
  * @param {string} template - 含 §NOW_*§ 的 system prompt
  * @param {object|null} timeSpec - { charUtcOffsetSeconds, userUtcOffsetSeconds, charName, periodTable[24] }
  * @param {number} nowMs - 当前真实时间戳
+ * @param {number} [lastInteractionAt=0] - 上次互动 epoch(ms)，用于重算「距上次多久」§NOW_SINCE§
  */
-export function renderTimeTokens(template, timeSpec, nowMs) {
+export function renderTimeTokens(template, timeSpec, nowMs, lastInteractionAt = 0) {
     const s = String(template || '');
     if (!timeSpec || !s.includes('§NOW_')) return s;
 
@@ -56,11 +57,37 @@ export function renderTimeTokens(template, timeSpec, nowMs) {
         userClock = ` | YOU(${timeSpec.charName || 'AI'})=${timeStr}, USER=${pad2(up.hour)}:${pad2(up.minute)} (${diffDesc})`;
     }
 
+    // 🕒 距上次互动的相对时间 —— 用 tick 真实 now 重算（治「后端生成的消息时间还是用户在线那刻」bug）。
+    //    lastInteractionAt=0（未知）→ 留空，AI 不被误导。
+    let sinceStr = '';
+    let sinceCtx = '';
+    if (lastInteractionAt > 0 && nowMs > lastInteractionAt) {
+        const gapMs = nowMs - lastInteractionAt;
+        const gapMin = Math.floor(gapMs / 60000);
+        const gapHr = Math.floor(gapMin / 60);
+        const gapDay = Math.floor(gapHr / 24);
+        if (gapDay >= 1) {
+            sinceStr = `${gapDay} 天前`;
+            sinceCtx = `⚠️TIME-GAP:${gapDay}d since last interaction — that scene/call is PAST, NOT live. BAN 刚/刚才/just-now/还在 anchored to it. This is a fresh moment you reach out in.`;
+        } else if (gapHr >= 1) {
+            sinceStr = `${gapHr} 小时前`;
+            sinceCtx = `It has been ~${gapHr}h since you last talked. NOW (${timeStr}) is the real moment — do not treat the last message as just-sent.`;
+        } else if (gapMin >= 10) {
+            sinceStr = `${gapMin} 分钟前`;
+            sinceCtx = `It has been ~${gapMin}min since the last message. NOW (${timeStr}) is the real moment, not their send time.`;
+        } else {
+            sinceStr = '刚刚';
+            sinceCtx = '';
+        }
+    }
+
     return s
         .replaceAll('§NOW_TIME§', timeStr)
         .replaceAll('§NOW_DATE§', dateStr)
         .replaceAll('§NOW_PERIOD§', period.label || '')
         .replaceAll('§NOW_GREET_OK§', period.greetOk || '')
         .replaceAll('§NOW_GREET_BAN§', period.greetBan || '')
-        .replaceAll('§NOW_USERCLOCK§', userClock);
+        .replaceAll('§NOW_USERCLOCK§', userClock)
+        .replaceAll('§NOW_SINCE§', sinceStr)
+        .replaceAll('§NOW_SINCE_CTX§', sinceCtx);
 }

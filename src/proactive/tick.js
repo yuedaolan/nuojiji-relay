@@ -96,7 +96,7 @@ export async function runProactiveTick(env) {
                 console.warn('[proactive] memory context failed:', e?.message);
             }
             // 先填即时真时间哨兵（§NOW_*§），再填滑窗/理由/记忆占位符。
-            const timedTemplate = renderTimeTokens(rec.promptTemplate, rec.timeSpec, now);
+            const timedTemplate = renderTimeTokens(rec.promptTemplate, rec.timeSpec, now, rec.lastInteractionAt || 0);
             const systemContent = fillTemplate(timedTemplate, { transcript, reason: verdict.reason, memory });
             const messages = [{ role: 'system', content: systemContent }];
 
