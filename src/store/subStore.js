@@ -18,9 +18,12 @@ const SUB_TTL_SEC = 60 * 60 * 24 * 60; // 60 天
 
 class KvSubStore {
     constructor(kv) { this.kv = kv; }
-    async add(inboxId, subscription) {
+   async add(inboxId, subscription) {
         const key = `s:${inboxId}:${subKey(subscription)}`;
-        await this.kv.put(key, JSON.stringify(subscription), { expirationTtl: SUB_TTL_SEC });
+        const newVal = JSON.stringify(subscription);
+        const existing = await this.kv.get(key);
+        if (existing === newVal) return;
+        await this.kv.put(key, newVal, { expirationTtl: SUB_TTL_SEC });
     }
     async list(inboxId) {
         const out = [];
